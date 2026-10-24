@@ -1,0 +1,3 @@
+# Läuft auf Linux (Docker) – Zeilenenden immer LF, auch beim Auschecken unter Windows
+* text=auto eol=lf
+*.png binary

@@ -1,0 +1,17 @@
+services:
+  kleinanzeigen-radar:
+    build: .
+    image: kleinanzeigen-radar:latest
+    container_name: kleinanzeigen-radar
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./data:/data
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"

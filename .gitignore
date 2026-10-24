@@ -1,0 +1,12 @@
+# Zugangsdaten und Laufzeitdaten
+.env
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Lokale Projektnotizen
+CLAUDE.md
+demo-data/

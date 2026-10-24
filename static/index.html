@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>Kleinanzeigen-Radar</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<script>
+  // Theme und eingeklapptes Menü vor dem ersten Zeichnen setzen (kein Aufblitzen)
+  try {
+    var t = localStorage.getItem('kr-theme');
+    if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark');
+    if (localStorage.getItem('kr-side') === 'collapsed') document.documentElement.classList.add('side-collapsed');
+  } catch (e) {}
+</script>
+</head>
+<body>
+
+<header class="top">
+  <button class="icon-btn" onclick="toggleSide()" title="Menü ein-/ausklappen" aria-label="Menü">
+    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <a class="brand" href="/" title="Kleinanzeigen-Radar">
+    <img class="logo-mark" src="/static/favicon.svg" alt="" width="26" height="26">
+    <span class="wordmark">Kleinanzeigen-Radar</span>
+  </a>
+  <label class="find find-top">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input type="search" class="find-input" placeholder="In Treffern suchen …" oninput="onFind(this.value)" autocomplete="off">
+  </label>
+  <div class="state" id="state" title="">
+    <span class="dot" id="status-dot"></span><span id="status-text">Lade …</span>
+  </div>
+  <button class="btn" id="btn-scan" onclick="scanNow()" title="Jetzt suchen">
+    <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg><span class="lbl">Jetzt suchen</span>
+  </button>
+  <button class="btn" id="btn-run" onclick="toggleRunning()">
+    <svg viewBox="0 0 24 24" id="run-icon"></svg><span class="lbl" id="run-label">Starten</span>
+  </button>
+  <button class="icon-btn" onclick="toggleTheme()" title="Hell / Dunkel" aria-label="Hell / Dunkel">
+    <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
+  </button>
+</header>
+
+<div class="shell">
+  <nav class="side" id="side">
+    <button class="folder" data-folder="all" onclick="setFolder('all')">
+      <svg viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      <span class="fl">Alle Treffer</span><span class="n" id="n-all"></span>
+    </button>
+    <button class="folder" data-folder="new" onclick="setFolder('new')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/></svg>
+      <span class="fl">Neu</span><span class="n" id="n-new"></span>
+    </button>
+
+    <h4>Suchen</h4>
+    <div id="search-folders"></div>
+    <button class="folder add" onclick="openNewSearch()">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="fl">Neue Suche</span>
+    </button>
+
+    <h4>Auswertung</h4>
+    <button class="folder" data-folder="db" onclick="showView('db')">
+      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+      <span class="fl">Datenbank</span><span class="n" id="n-db"></span>
+    </button>
+    <button class="folder" data-folder="settings" onclick="showView('settings')">
+      <svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+      <span class="fl">Einstellungen</span>
+    </button>
+
+    <div class="side-foot" id="side-foot"></div>
+    <div class="side-foot version">v__VERSION__</div>
+  </nav>
+  <div class="side-backdrop" onclick="closeSideMobile()"></div>
+
+  <!-- Trefferliste -->
+  <section class="pane-list" id="pane-list">
+    <div class="list-head">
+      <div class="lh-row">
+        <h2 id="list-title">Alle Treffer</h2>
+        <span class="lh-count" id="list-count"></span>
+        <div class="lh-actions">
+          <button class="btn sm" id="btn-read-all" onclick="markAllSeen()">Alle gelesen</button>
+          <select class="btn sm" id="sort-sel" onchange="setSort(this.value)">
+            <option value="new">Neueste</option>
+            <option value="price_asc">Preis ↑</option>
+            <option value="price_desc">Preis ↓</option>
+          </select>
+        </div>
+      </div>
+      <label class="find find-list">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" class="find-input" placeholder="In Treffern suchen …" oninput="onFind(this.value)" autocomplete="off">
+      </label>
+    </div>
+    <div id="banners"></div>
+    <div id="rows" class="rows"></div>
+    <button class="more-btn" id="more-btn" hidden onclick="toggleMore()"></button>
+    <div class="empty" id="empty" hidden></div>
+  </section>
+
+  <!-- Vorschau / Editor -->
+  <aside class="pane-detail" id="pane-detail">
+    <div class="detail-bar">
+      <button class="btn sm back" onclick="closeDetail()">
+        <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Zurück
+      </button>
+    </div>
+    <div id="detail" class="detail"></div>
+  </aside>
+
+  <!-- Datenbank -->
+  <section class="pane-main" id="view-db" hidden>
+    <div class="page-head"><h2>Datenbank</h2>
+      <div class="lh-actions">
+        <button class="btn sm" onclick="loadDb()" title="Neu laden">
+          <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg><span class="lbl">Neu laden</span></button>
+        <a class="btn sm" href="/api/history/download" title="Komplette Datenbank herunterladen (SQLite)">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg><span class="lbl">Download</span></a>
+      </div>
+    </div>
+    <div class="db-stats" id="db-stats"></div>
+    <div class="db-search-cards" id="db-searches"></div>
+    <div class="seg" id="db-subtabs">
+      <button class="on" data-sub="listings" onclick="showDbSub('listings')">Anzeigen</button>
+      <button data-sub="changes" onclick="showDbSub('changes')">Änderungen</button>
+      <button data-sub="runs" onclick="showDbSub('runs')">Abrufe</button>
+    </div>
+    <div class="db-filters" id="db-filters"></div>
+    <div class="db-table-wrap" id="db-table"></div>
+    <div class="db-pager" id="db-pager"></div>
+  </section>
+
+  <!-- Einstellungen -->
+  <section class="pane-main" id="view-settings" hidden>
+    <div class="page-head"><h2>Einstellungen</h2></div>
+
+    <div class="set-group">
+      <h3>Überwachung</h3>
+      <div class="set-row">
+        <label for="interval-sel">Intervall (zufällig)</label>
+        <select id="interval-sel" onchange="onSettingChange()">
+          <option value="60-180">1 – 3 Minuten</option>
+          <option value="120-300">2 – 5 Minuten</option>
+          <option value="180-300">3 – 5 Minuten</option>
+          <option value="300-600">5 – 10 Minuten</option>
+          <option value="600-1200">10 – 20 Minuten</option>
+        </select>
+      </div>
+      <label class="set-check"><input type="checkbox" id="hide-requests" onchange="onSettingChange()"> „Gesuch“-Anzeigen ausblenden</label>
+    </div>
+
+    <div class="set-group">
+      <h3>Orte hervorheben <span class="muted">– PLZ-Anfänge, durch Komma getrennt</span></h3>
+      <div class="set-row">
+        <label for="hl-zip">PLZ beginnt mit</label>
+        <input type="text" id="hl-zip" placeholder="z. B. 20, 22" maxlength="200" onchange="onSettingChange()">
+      </div>
+      <p class="muted">Orte mit passender Postleitzahl werden in Liste und Vorschau farbig markiert. Leer = keine Hervorhebung.</p>
+    </div>
+
+    <div class="set-group">
+      <h3>Blacklist <span class="muted">– gilt für alle Suchen, Wörter im Titel</span></h3>
+      <div class="inline-add">
+        <input type="text" id="bl-input" placeholder="Wort hinzufügen …" maxlength="60" onkeydown="if(event.key==='Enter')addBlackword()">
+        <button class="btn" onclick="addBlackword()">Hinzufügen</button>
+      </div>
+      <div class="tags" id="bl-tags"></div>
+    </div>
+
+    <div class="set-group">
+      <h3>Telegram</h3>
+      <label class="set-check"><input type="checkbox" id="tg-enabled" onchange="onSettingChange()"> Neue Anzeigen per Telegram melden</label>
+      <p class="muted" id="tg-hint"></p>
+      <p class="muted">Warnungen des Parser-Wächters kommen immer per Telegram.</p>
+      <button class="btn" onclick="testTelegram()">Testnachricht senden</button>
+    </div>
+
+    <div class="set-group">
+      <h3>Browser-Hinweise</h3>
+      <p class="muted">Kurze Benachrichtigung des Browsers bei neuen Anzeigen, solange die Seite offen ist.</p>
+      <button class="btn" id="notif-btn" onclick="handleNotifBtn()">Aktivieren</button>
+    </div>
+
+    <div class="set-group">
+      <h3>Such-Sets <span class="muted">– aktive Suchen samt Einstellungen speichern</span></h3>
+      <button class="btn" onclick="saveSearchSet()">Aktive Suchen als Set speichern</button>
+      <div class="set-list" id="set-list"></div>
+      <p class="muted">Laden ersetzt die aktuelle Suchliste.</p>
+    </div>
+
+    <div class="set-group">
+      <h3>Trefferliste</h3>
+      <p class="muted">Leert die Liste in der Oberfläche. Bekannte Anzeigen werden nicht erneut gemeldet, die Datenbank bleibt unverändert.</p>
+      <button class="btn danger" onclick="clearListings()">Liste leeren</button>
+    </div>
+  </section>
+</div>
+
+<div id="toast" role="status"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
